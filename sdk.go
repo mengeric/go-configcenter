@@ -9,11 +9,11 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
-	"github.com/xxx/go-configcenter/adapter"
-	"github.com/xxx/go-configcenter/adapter/nacos"
-	"github.com/xxx/go-configcenter/configmerge"
-	"github.com/xxx/go-configcenter/local"
-	"github.com/xxx/go-configcenter/subscriber"
+	"github.com/mengeric/go-configcenter/adapter"
+	"github.com/mengeric/go-configcenter/adapter/nacos"
+	"github.com/mengeric/go-configcenter/configmerge"
+	"github.com/mengeric/go-configcenter/local"
+	"github.com/mengeric/go-configcenter/subscriber"
 )
 
 // ============================================================

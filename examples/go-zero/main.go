@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	goconfigcenter "github.com/xxx/go-configcenter"
+	goconfigcenter "github.com/mengeric/go-configcenter"
 )
 
 // ============================================================

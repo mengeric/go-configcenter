@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	goconfigcenter "github.com/xxx/go-configcenter"
+	goconfigcenter "github.com/mengeric/go-configcenter"
 )
 
 // ============================================================

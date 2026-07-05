@@ -1,4 +1,4 @@
-module github.com/xxx/go-configcenter
+module github.com/mengeric/go-configcenter
 
 go 1.24.0
 

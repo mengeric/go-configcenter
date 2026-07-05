@@ -3,7 +3,7 @@ package local
 import (
 	"testing"
 
-	"github.com/xxx/go-configcenter/adapter"
+	"github.com/mengeric/go-configcenter/adapter"
 )
 
 // ============================================================

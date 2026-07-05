@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/xxx/go-configcenter/adapter"
+	"github.com/mengeric/go-configcenter/adapter"
 )
 
 // ============================================================

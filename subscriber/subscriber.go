@@ -3,8 +3,8 @@ package subscriber
 import (
 	"sync"
 
-	"github.com/xxx/go-configcenter/adapter"
-	"github.com/xxx/go-configcenter/configmerge"
+	"github.com/mengeric/go-configcenter/adapter"
+	"github.com/mengeric/go-configcenter/configmerge"
 )
 
 // ============================================================
