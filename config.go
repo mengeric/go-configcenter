@@ -6,60 +6,42 @@ package goconfigcenter
 
 // ArgoConfig 是 argo.yaml 的完整结构
 type ArgoConfig struct {
-	// Nacos 连接配置（可选，为空则纯本地模式）
-	Nacos *NacosConfig `yaml:"nacos" json:"nacos"`
+	// Registry 注册中心配置
+	Registry RegistryConfig `yaml:"registry" json:"registry"`
 
-	// 当前服务注册信息
-	Service ServiceInfo `yaml:"service" json:"service"`
-
-	// 本地配置文件列表（按顺序 merge，后面的覆盖前面的）
-	Local []string `yaml:"local" json:"local"`
-
-	// Nacos 远程配置列表（按顺序 merge）
-	Remote []RemoteConfig `yaml:"remote" json:"remote"`
-
-	// 无 Nacos 时的本地服务地址表
-	Services map[string]ServiceAddr `yaml:"services" json:"services"`
+	// Services 各服务配置（按服务名取）
+	Services map[string]ServiceConfig `yaml:"services" json:"services"`
 }
 
-// NacosConfig Nacos 连接配置
-type NacosConfig struct {
-	// Nacos 地址（ip:port）
+// RegistryConfig 注册中心配置
+type RegistryConfig struct {
+	// Type 注册中心类型（nacos / etcd / consul）
+	Type string `yaml:"type" json:"type"`
+
+	// Addr 注册中心地址（ip:port）
 	Addr string `yaml:"addr" json:"addr"`
 
-	// 命名空间（public 传空字符串）
+	// Namespace 命名空间（nacos 用，public 传空字符串）
 	Namespace string `yaml:"namespace" json:"namespace"`
 
-	// 分组
+	// Group 分组
 	Group string `yaml:"group" json:"group"`
 }
 
-// ServiceInfo 当前服务信息（用于注册）
-type ServiceInfo struct {
-	// 服务名称（如 galaxy、phoenix）
-	Name string `yaml:"name" json:"name"`
+// ServiceConfig 单个服务配置
+type ServiceConfig struct {
+	// Local 本地配置文件列表（按顺序 merge，后面的覆盖前面的）
+	Local []string `yaml:"local" json:"local"`
 
-	// 监听地址
-	Host string `yaml:"host" json:"host"`
-
-	// 监听端口
-	Port uint64 `yaml:"port" json:"port"`
+	// Remote Nacos 远程配置列表（按顺序 merge）
+	Remote []RemoteConfig `yaml:"remote" json:"remote"`
 }
 
 // RemoteConfig Nacos 远程配置项
 type RemoteConfig struct {
-	// Nacos DataId
+	// DataId Nacos 配置 ID
 	DataId string `yaml:"dataId" json:"dataId"`
 
-	// Nacos Group
+	// Group Nacos 分组
 	Group string `yaml:"group" json:"group"`
-}
-
-// ServiceAddr 本地服务地址（无 Nacos 时使用）
-type ServiceAddr struct {
-	// 服务地址
-	Host string `yaml:"host" json:"host"`
-
-	// 服务端口
-	Port uint64 `yaml:"port" json:"port"`
 }

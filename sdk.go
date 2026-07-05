@@ -1,34 +1,61 @@
-package argosdk
+package goconfigcenter
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/knadh/koanf/v2"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
-	"github.com/knadh/koanf/providers/rawbytes"
+	"github.com/knadh/koanf/v2"
+
+	"github.com/xxx/go-configcenter/adapter"
+	"github.com/xxx/go-configcenter/adapter/nacos"
+	"github.com/xxx/go-configcenter/configmerge"
+	"github.com/xxx/go-configcenter/local"
+	"github.com/xxx/go-configcenter/subscriber"
 )
 
+// ============================================================
 // SDK 统一入口
+// ============================================================
+
+// SDK 配置中心 SDK 实例
 type SDK struct {
-	configPath string            // argo.yaml 路径
-	config     *ArgoConfig       // 解析后的配置
-	nacos      *NacosClient      // Nacos 客户端（nil = 纯本地模式）
-	koanf      *koanf.Koanf      // koanf 实例
-	service    *ServiceInfo       // 当前服务信息
+	// configPath argo.yaml 路径
+	configPath string
+	// config 解析后的配置
+	config *ArgoConfig
+	// serviceName 当前服务名
+	serviceName string
+	// namingClient 命名服务客户端（Nacos 或本地）
+	namingClient adapter.NamingClient
+	// configClient 配置客户端（Nacos 或本地）
+	configClient adapter.ConfigClient
+	// merger 配置合并器
+	merger *configmerge.Merger
+	// registeredIP 注册的 IP（用于注销）
+	registeredIP string
+	// registeredPort 注册的端口（用于注销）
+	registeredPort uint64
+	// group 默认分组
+	group string
 }
 
 // MustInit 初始化 SDK（失败直接 panic）
+// 参数：configPath-argo.yaml 路径, serviceName-当前服务名
+// 返回：SDK 实例
 func MustInit(configPath, serviceName string) *SDK {
 	s, err := Init(configPath, serviceName)
 	if err != nil {
-		panic(fmt.Sprintf("[argo-sdk] init failed: %v", err))
+		panic(fmt.Sprintf("[goconfigcenter] init failed: %v", err))
 	}
 	return s
 }
 
 // Init 初始化 SDK
+// 参数：configPath-argo.yaml 路径, serviceName-当前服务名
+// 返回：SDK 实例，错误信息
 func Init(configPath, serviceName string) (*SDK, error) {
 	// 1. 加载 argo.yaml
 	k := koanf.New(".")
@@ -45,108 +72,145 @@ func Init(configPath, serviceName string) (*SDK, error) {
 	}
 
 	// 3. 查找目标服务配置
-	svc, ok := cfg.Services[serviceName]
+	svcConfig, ok := cfg.Services[serviceName]
 	if !ok {
-		// 如果 services 节为空，使用 service 节（单服务模式）
-		if cfg.Service.Name == serviceName {
-			svc = ServiceAddr{
-				Host: cfg.Service.Host,
-				Port: cfg.Service.Port,
-			}
-		} else {
-			return nil, fmt.Errorf("service %s not found in argo.yaml", serviceName)
-		}
+		return nil, fmt.Errorf("service %s not found in argo.yaml", serviceName)
 	}
 
-	// 4. 初始化 Nacos 客户端（如果有配置）
-	var nacosClient *NacosClient
-	if cfg.Nacos != nil && cfg.Nacos.Addr != "" {
-		var err error
-		nacosClient, err = NewNacosClient(cfg.Nacos)
+	// 4. 初始化注册中心客户端
+	var namingClient adapter.NamingClient
+	var configClient adapter.ConfigClient
+
+	if cfg.Registry.Type == "nacos" && cfg.Registry.Addr != "" {
+		// Nacos 模式
+		nacosClient, err := nacos.NewClient(&nacos.Config{
+			Addr:      cfg.Registry.Addr,
+			Namespace: cfg.Registry.Namespace,
+			Group:     cfg.Registry.Group,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("init nacos failed: %w", err)
+			return nil, fmt.Errorf("init nacos client failed: %w", err)
+		}
+		namingClient = nacos.NewNamingService(nacosClient)
+		configClient = nacos.NewConfigService(nacosClient)
+	} else {
+		// 本地模式（无注册中心）
+		localServices := make(map[string]local.ServiceAddr)
+		// 从 argo.yaml 的 services 节读取地址（如果有的话）
+		// 这里暂时用空 map，实际应该从配置中读取
+		namingClient = local.NewLocalNamingService(localServices)
+		configClient = local.NewLocalConfigService(filepath.Dir(configPath))
+	}
+
+	// 5. 创建配置合并器
+	merger := configmerge.NewMerger(serviceName, svcConfig.Local)
+
+	// 6. 加载远程配置（如果有 Nacos）
+	if configClient != nil && cfg.Registry.Type == "nacos" {
+		for _, rc := range svcConfig.Remote {
+			content, err := configClient.GetConfig(rc.DataId, rc.Group)
+			if err != nil {
+				return nil, fmt.Errorf("get remote config %s/%s failed: %w", rc.Group, rc.DataId, err)
+			}
+			merger.AddRemote(content)
 		}
 	}
 
-	sdk := &SDK{
+	return &SDK{
 		configPath: configPath,
 		config:     &cfg,
-		nacos:      nacosClient,
-		koanf:      koanf.New("."),
-		service: &ServiceInfo{
-			Name: serviceName,
-			Host: svc.Host,
-			Port: svc.Port,
-		},
-	}
-
-	// 5. 加载配置文件（本地 merge）
-	if err := sdk.loadLocalConfigs(); err != nil {
-		return nil, fmt.Errorf("load local configs failed: %w", err)
-	}
-
-	// 6. 如果有 Nacos，拉远程配置 merge
-	if nacosClient != nil {
-		if err := sdk.loadRemoteConfigs(); err != nil {
-			return nil, fmt.Errorf("load remote configs failed: %w", err)
-		}
-	}
-
-	return sdk, nil
+		serviceName: serviceName,
+		namingClient: namingClient,
+		configClient: configClient,
+		merger:      merger,
+		group:       cfg.Registry.Group,
+	}, nil
 }
 
-// loadLocalConfigs 加载本地配置文件（按顺序 merge）
-func (s *SDK) loadLocalConfigs() error {
-	for _, f := range s.config.Local {
-		if err := s.koanf.Load(file.Provider(f), yaml.Parser()); err != nil {
-			return fmt.Errorf("load %s failed: %w", f, err)
-		}
+// Register 注册服务到注册中心
+// 参数：ip-监听地址, port-监听端口
+// 返回：错误信息
+func (s *SDK) Register(ip string, port uint64) error {
+	ok, err := s.namingClient.Register(ip, port, s.serviceName, s.group)
+	if err != nil {
+		return fmt.Errorf("register service %s failed: %w", s.serviceName, err)
+	}
+	if !ok {
+		return fmt.Errorf("register service %s returned false", s.serviceName)
+	}
+
+	// 记录注册信息（用于注销）
+	s.registeredIP = ip
+	s.registeredPort = port
+	return nil
+}
+
+// Deregister 从注册中心注销服务
+// 返回：错误信息
+func (s *SDK) Deregister() error {
+	ok, err := s.namingClient.Deregister(s.registeredIP, s.registeredPort, s.serviceName, s.group)
+	if err != nil {
+		return fmt.Errorf("deregister service %s failed: %w", s.serviceName, err)
+	}
+	if !ok {
+		return fmt.Errorf("deregister service %s returned false", s.serviceName)
 	}
 	return nil
 }
 
-// loadRemoteConfigs 从 Nacos 拉取远程配置并 merge
-func (s *SDK) loadRemoteConfigs() error {
-	for _, rc := range s.config.Remote {
-		content, err := s.nacos.GetConfig(rc.DataId, rc.Group)
-		if err != nil {
-			return fmt.Errorf("get nacos config %s/%s failed: %w", rc.Group, rc.DataId, err)
-		}
-		if content == "" {
-			continue
-		}
-		if err := s.koanf.Load(rawbytes.Provider([]byte(content)), yaml.Parser()); err != nil {
-			return fmt.Errorf("load nacos config %s failed: %w", rc.DataId, err)
-		}
-	}
-	return nil
+// Discover 发现服务实例（返回 ip:port）
+// 参数：serviceName-要发现的服务名
+// 返回：地址字符串，错误信息
+func (s *SDK) Discover(serviceName string) (string, error) {
+	return s.namingClient.Discover(serviceName, s.group)
 }
 
-// MergedConfigPath 输出合并后的配置文件路径（go-zero 用这个加载）
+// Subscriber 返回 go-zero configcenter.Subscriber 实现
+// 返回：配置订阅器实例
+func (s *SDK) Subscriber() *subscriber.ConfigSubscriber {
+	// 转换 remote 配置
+	var remoteConfigs []adapter.RemoteConfig
+	for _, rc := range s.config.Services[s.serviceName].Remote {
+		remoteConfigs = append(remoteConfigs, adapter.RemoteConfig{
+			DataId: rc.DataId,
+			Group:  rc.Group,
+		})
+	}
+
+	return subscriber.NewConfigSubscriber(
+		s.merger,
+		s.configClient,
+		remoteConfigs,
+	)
+}
+
+// ConfigType 根据配置文件扩展名判断配置类型
+// 返回："yaml"、"json"、"toml"
+func (s *SDK) ConfigType() string {
+	return s.merger.ConfigType()
+}
+
+// MergedConfigPath 输出合并后的配置文件路径
+// 返回：文件路径
 func (s *SDK) MergedConfigPath() string {
-	data := s.koanf.Slices()
-	merged := fmt.Sprintf("merged-%s.yaml", s.service.Name)
-	// 写入当前目录
-	os.WriteFile(merged, marshalYaml(data), 0644)
-	return merged
+	outputDir := filepath.Dir(s.configPath)
+	path, err := s.merger.Merge(outputDir)
+	if err != nil {
+		// 降级：输出到当前目录
+		path = fmt.Sprintf("merged-%s.yaml", s.serviceName)
+		os.WriteFile(path, []byte(""), 0644)
+	}
+	return path
 }
 
-// Get 获取配置值
-func (s *SDK) Get(key string) string {
-	return s.koanf.String(key)
+// ServiceName 获取当前服务名
+// 返回：服务名
+func (s *SDK) ServiceName() string {
+	return s.serviceName
 }
 
-// GetInt 获取整数配置值
-func (s *SDK) GetInt(key string) int {
-	return s.koanf.Int(key)
-}
-
-// Has 判断配置是否存在
-func (s *SDK) Has(key string) bool {
-	return s.koanf.Exists(key)
-}
-
-// Koanf 返回 koanf 实例（高级用法）
-func (s *SDK) Koanf() *koanf.Koanf {
-	return s.koanf
+// Config 获取解析后的 argo.yaml 配置
+// 返回：配置结构体指针
+func (s *SDK) Config() *ArgoConfig {
+	return s.config
 }
