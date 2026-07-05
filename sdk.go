@@ -2,7 +2,6 @@ package goconfigcenter
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -190,18 +189,7 @@ func (s *SDK) ConfigType() string {
 	return s.merger.ConfigType()
 }
 
-// MergedConfigPath 输出合并后的配置文件路径
-// 返回：文件路径
-func (s *SDK) MergedConfigPath() string {
-	outputDir := filepath.Dir(s.configPath)
-	path, err := s.merger.Merge(outputDir)
-	if err != nil {
-		// 降级：输出到当前目录
-		path = fmt.Sprintf("merged-%s.yaml", s.serviceName)
-		os.WriteFile(path, []byte(""), 0644)
-	}
-	return path
-}
+
 
 // ServiceName 获取当前服务名
 // 返回：服务名

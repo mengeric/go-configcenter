@@ -2,7 +2,6 @@ package configmerge
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/knadh/koanf/parsers/yaml"
@@ -43,45 +42,6 @@ func (m *Merger) AddRemote(content string) {
 	if content != "" {
 		m.remoteContents = append(m.remoteContents, content)
 	}
-}
-
-// Merge 合并所有配置并输出到临时文件
-// 参数：outputDir-输出目录（默认当前目录）
-// 返回：合并后的文件路径，错误信息
-func (m *Merger) Merge(outputDir string) (string, error) {
-	k := koanf.New(".")
-
-	// 1. 加载本地配置文件（按顺序 merge，后面的覆盖前面的）
-	for _, f := range m.localFiles {
-		if err := k.Load(file.Provider(f), yaml.Parser()); err != nil {
-			return "", fmt.Errorf("[configmerge] load local file %s failed: %w", f, err)
-		}
-	}
-
-	// 2. 加载远程配置内容（按顺序 merge）
-	for _, content := range m.remoteContents {
-		if err := k.Load(rawbytes.Provider([]byte(content)), yaml.Parser()); err != nil {
-			return "", fmt.Errorf("[configmerge] load remote config failed: %w", err)
-		}
-	}
-
-	// 3. 序列化为 YAML
-	data := k.All()
-	yamlBytes, err := yamlv2.Marshal(data)
-	if err != nil {
-		return "", fmt.Errorf("[configmerge] marshal yaml failed: %w", err)
-	}
-
-	// 4. 输出到文件
-	if outputDir == "" {
-		outputDir = "."
-	}
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("merged-%s.yaml", m.serviceName))
-	if err := os.WriteFile(outputPath, yamlBytes, 0644); err != nil {
-		return "", fmt.Errorf("[configmerge] write merged file failed: %w", err)
-	}
-
-	return outputPath, nil
 }
 
 // MergeToBytes 合并所有配置并返回字节内容（不写文件）
