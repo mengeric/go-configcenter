@@ -6,7 +6,6 @@ import (
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
-	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/knadh/koanf/v2"
 	yamlv2 "gopkg.in/yaml.v2"
 )
@@ -48,23 +47,52 @@ func (m *Merger) AddRemote(content string) {
 // 合并顺序：远程配置 → 本地配置（本地覆盖远程）
 // 返回：合并后的 YAML 字节内容，错误信息
 func (m *Merger) MergeToBytes() ([]byte, error) {
-	k := koanf.New(".")
+	// 使用 yamlv2 直接解析合并，保留嵌套结构
+	merged := make(map[string]interface{})
 
-	// 1. 加载远程配置内容（优先级低）
+	// 1. 加载远程配置（优先级低）
 	for _, content := range m.remoteContents {
-		if err := k.Load(rawbytes.Provider([]byte(content)), yaml.Parser()); err != nil {
-			return nil, fmt.Errorf("[configmerge] load remote config failed: %w", err)
+		var cfg map[string]interface{}
+		if err := yamlv2.Unmarshal([]byte(content), &cfg); err != nil {
+			return nil, fmt.Errorf("[configmerge] unmarshal remote config failed: %w", err)
 		}
+		mergeMap(merged, cfg)
 	}
 
 	// 2. 加载本地配置文件（优先级高，覆盖远程）
 	for _, f := range m.localFiles {
+		k := koanf.New(".")
 		if err := k.Load(file.Provider(f), yaml.Parser()); err != nil {
 			return nil, fmt.Errorf("[configmerge] load local file %s failed: %w", f, err)
 		}
+		data, err := k.Marshal(yaml.Parser())
+		if err != nil {
+			return nil, fmt.Errorf("[configmerge] marshal local file %s failed: %w", f, err)
+		}
+		var cfg map[string]interface{}
+		if err := yamlv2.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("[configmerge] unmarshal local file %s failed: %w", f, err)
+		}
+		mergeMap(merged, cfg)
 	}
 
-	return yamlv2.Marshal(k.All())
+	return yamlv2.Marshal(merged)
+}
+
+// mergeMap 递归合并 map（dst 被 src 覆盖）
+func mergeMap(dst, src map[string]interface{}) {
+	for k, v := range src {
+		if dstVal, ok := dst[k]; ok {
+			// 两个都是 map 时递归合并
+			if dstMap, ok := dstVal.(map[string]interface{}); ok {
+				if srcMap, ok := v.(map[string]interface{}); ok {
+					mergeMap(dstMap, srcMap)
+					continue
+				}
+			}
+		}
+		dst[k] = v
+	}
 }
 
 // ConfigType 根据本地配置文件扩展名判断配置类型
