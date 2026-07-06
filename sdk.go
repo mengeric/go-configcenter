@@ -95,8 +95,14 @@ func Init(configPath, serviceName string) (*SDK, error) {
 	} else {
 		// 本地模式（无注册中心）
 		localServices := make(map[string]local.ServiceAddr)
-		// 从 argo.yaml 的 services 节读取地址（如果有的话）
-		// 这里暂时用空 map，实际应该从配置中读取
+		for name, svc := range cfg.Services {
+			if svc.Host != "" && svc.Port > 0 {
+				localServices[name] = local.ServiceAddr{
+					Host: svc.Host,
+					Port: svc.Port,
+				}
+			}
+		}
 		namingClient = local.NewLocalNamingService(localServices)
 		configClient = local.NewLocalConfigService(filepath.Dir(configPath))
 	}

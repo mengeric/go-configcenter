@@ -30,6 +30,12 @@ type RegistryConfig struct {
 
 // ServiceConfig 单个服务配置
 type ServiceConfig struct {
+	// Host 服务地址（本地模式用于服务发现）
+	Host string `yaml:"host" json:"host"`
+
+	// Port 服务端口（本地模式用于服务发现）
+	Port uint64 `yaml:"port" json:"port"`
+
 	// Local 本地配置文件列表（按顺序 merge，后面的覆盖前面的）
 	Local []string `yaml:"local" json:"local"`
 
