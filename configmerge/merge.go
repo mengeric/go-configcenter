@@ -45,21 +45,22 @@ func (m *Merger) AddRemote(content string) {
 }
 
 // MergeToBytes 合并所有配置并返回字节内容（不写文件）
+// 合并顺序：远程配置 → 本地配置（本地覆盖远程）
 // 返回：合并后的 YAML 字节内容，错误信息
 func (m *Merger) MergeToBytes() ([]byte, error) {
 	k := koanf.New(".")
 
-	// 1. 加载本地配置文件
-	for _, f := range m.localFiles {
-		if err := k.Load(file.Provider(f), yaml.Parser()); err != nil {
-			return nil, fmt.Errorf("[configmerge] load local file %s failed: %w", f, err)
-		}
-	}
-
-	// 2. 加载远程配置内容
+	// 1. 加载远程配置内容（优先级低）
 	for _, content := range m.remoteContents {
 		if err := k.Load(rawbytes.Provider([]byte(content)), yaml.Parser()); err != nil {
 			return nil, fmt.Errorf("[configmerge] load remote config failed: %w", err)
+		}
+	}
+
+	// 2. 加载本地配置文件（优先级高，覆盖远程）
+	for _, f := range m.localFiles {
+		if err := k.Load(file.Provider(f), yaml.Parser()); err != nil {
+			return nil, fmt.Errorf("[configmerge] load local file %s failed: %w", f, err)
 		}
 	}
 

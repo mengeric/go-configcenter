@@ -35,6 +35,26 @@ addr, err := s.Discover("phoenix")
 
 ## 配置文件
 
+### 合并顺序
+
+配置按以下顺序合并（后者覆盖前者）：
+
+1. **远程配置**（Nacos） — 优先级低
+2. **本地配置** — 优先级高，覆盖远程
+
+```yaml
+services:
+  rag-service:
+    local:
+      - "etc/base.yaml"       # 1. 最先加载
+      - "etc/rag-service.yaml" # 2. 覆盖 base
+    remote:
+      - dataId: "shared.yaml"   # 3. 被 local 覆盖
+        group: "SHARED"
+      - dataId: "rag.yaml"      # 4. 被 local 覆盖
+        group: "APP"
+```
+
 ### Nacos 模式
 
 ```yaml
