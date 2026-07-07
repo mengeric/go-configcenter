@@ -224,6 +224,14 @@ func (s *SDK) Discover(serviceName string) (string, error) {
 	return scheme + "://" + addr, nil
 }
 
+// DiscoverRaw 发现服务实例（返回 ip:port，不含 scheme）
+// 适用于 gRPC 等不需要 scheme 的场景
+// 参数：serviceName-要发现的服务名
+// 返回：ip:port 格式地址，错误信息
+func (s *SDK) DiscoverRaw(serviceName string) (string, error) {
+	return s.namingClient.Discover(serviceName, s.group)
+}
+
 // Subscriber 返回 go-zero configcenter.Subscriber 实例
 // 返回：配置订阅器实例
 func (s *SDK) Subscriber() *subscriber.ConfigSubscriber {
