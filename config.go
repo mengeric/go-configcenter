@@ -26,6 +26,12 @@ type RegistryConfig struct {
 
 	// Group 分组
 	Group string `yaml:"group" json:"group"`
+
+	// Username Nacos 认证用户名（可选，为空则不认证）
+	Username string `yaml:"username" json:"username"`
+
+	// Password Nacos 认证密码
+	Password string `yaml:"password" json:"password"`
 }
 
 // ServiceConfig 单个服务配置

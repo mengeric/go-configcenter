@@ -86,6 +86,8 @@ func Init(configPath, serviceName string) (*SDK, error) {
 			Addr:      cfg.Registry.Addr,
 			Namespace: cfg.Registry.Namespace,
 			Group:     cfg.Registry.Group,
+			Username:  cfg.Registry.Username,
+			Password:  cfg.Registry.Password,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("init nacos client failed: %w", err)

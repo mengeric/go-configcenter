@@ -2,6 +2,7 @@ package nacos
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
@@ -61,7 +62,7 @@ func (ns *NamingService) Deregister(ip string, port uint64, serviceName, group s
 	})
 }
 
-// Discover 发现服务实例（返回 ip:port）
+// Discover 发现服务实例（返回 ip:port，加权轮询）
 // 参数：serviceName-服务名, group-分组
 // 返回：地址字符串（ip:port），错误信息
 func (ns *NamingService) Discover(serviceName, group string) (string, error) {
@@ -71,8 +72,8 @@ func (ns *NamingService) Discover(serviceName, group string) (string, error) {
 	ns.lock.RUnlock()
 
 	if ok && len(instances) > 0 {
-		// 简单轮询（后续可改为 WRR）
-		inst := instances[0]
+		// 加权轮询（WRR）
+		inst := ns.weightedSelect(instances)
 		return fmt.Sprintf("%s:%d", inst.Ip, inst.Port), nil
 	}
 
@@ -85,6 +86,48 @@ func (ns *NamingService) Discover(serviceName, group string) (string, error) {
 		return "", fmt.Errorf("[nacos] discover service %s failed: %w", serviceName, err)
 	}
 	return fmt.Sprintf("%s:%d", instance.Ip, instance.Port), nil
+}
+
+// weightedSelect 加权轮询选择实例
+// 根据实例权重随机选择，权重越高被选中的概率越大
+func (ns *NamingService) weightedSelect(instances []adapter.Instance) adapter.Instance {
+	// 过滤健康实例
+	var healthy []adapter.Instance
+	var totalWeight float64
+	for _, inst := range instances {
+		if inst.Healthy && inst.Enable {
+			w := inst.Weight
+			if w <= 0 {
+				w = 1
+			}
+			totalWeight += w
+			healthy = append(healthy, inst)
+		}
+	}
+
+	if len(healthy) == 0 {
+		return instances[0]
+	}
+
+	if len(healthy) == 1 {
+		return healthy[0]
+	}
+
+	// 加权随机
+	rand := rand.Float64() * totalWeight
+	var cumulative float64
+	for _, inst := range healthy {
+		w := inst.Weight
+		if w <= 0 {
+			w = 1
+		}
+		cumulative += w
+		if rand <= cumulative {
+			return inst
+		}
+	}
+
+	return healthy[len(healthy)-1]
 }
 
 // Subscribe 订阅服务实例变化（动态更新本地缓存）

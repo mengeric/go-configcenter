@@ -32,6 +32,12 @@ type Config struct {
 
 	// Group 默认分组
 	Group string
+
+	// Username 认证用户名（可选）
+	Username string
+
+	// Password 认证密码
+	Password string
 }
 
 // NewClient 创建 Nacos 客户端
@@ -52,6 +58,12 @@ func NewClient(cfg *Config) (*Client, error) {
 		LogDir:              "/tmp/nacos/log",
 		CacheDir:            "/tmp/nacos/cache",
 		LogLevel:            "info",
+	}
+
+	// 认证配置（Username 非空时启用）
+	if cfg.Username != "" {
+		clientConfig.Username = cfg.Username
+		clientConfig.Password = cfg.Password
 	}
 
 	// 服务端配置
