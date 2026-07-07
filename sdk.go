@@ -155,6 +155,17 @@ func (s *SDK) Register(ip string, port uint64) error {
 	return nil
 }
 
+// QuickRegister 快速注册 — 从全局配置 services.<name>.host/port 读取地址并注册
+// 适用于 Nacos 不可用时的本地 fallback 模式
+// 返回：错误信息
+func (s *SDK) QuickRegister() error {
+	svc := s.config.Services[s.serviceName]
+	if svc.Host == "" || svc.Port == 0 {
+		return fmt.Errorf("service %s host/port not configured in argo.yaml", s.serviceName)
+	}
+	return s.Register(svc.Host, uint64(svc.Port))
+}
+
 // Deregister 从注册中心注销服务
 // 返回：错误信息
 func (s *SDK) Deregister() error {
