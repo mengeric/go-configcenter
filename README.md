@@ -17,11 +17,16 @@ Go 服务统一接入 SDK，支持 Nacos 模式和纯本地模式。
 // 初始化 SDK
 s := goconfigcenter.MustInit("etc/global.yaml", "rag-service")
 
-// 注册服务
-if err := s.Register("0.0.0.0", 8080); err != nil {
+// 快速注册（从全局配置 services.<name>.host/port 读取地址）
+if err := s.QuickRegister(); err != nil {
     panic(err)
 }
 defer s.Deregister()
+
+// 或手动指定地址注册
+// if err := s.Register("0.0.0.0", 8080); err != nil {
+//     panic(err)
+// }
 
 // 用 go-zero configcenter 加载配置
 cc := configurator.MustNewConfigCenter[Config](configurator.Config{
@@ -101,11 +106,21 @@ services:
 | 方法 | 说明 |
 |------|------|
 | `MustInit(file, serviceName)` | 初始化 |
-| `Register(ip, port)` | 注册服务 |
+| `Register(ip, port)` | 手动指定地址注册 |
+| `QuickRegister()` | 快速注册（从全局配置 host/port 读取） |
 | `Deregister()` | 注销服务 |
 | `Subscriber()` | 返回 go-zero Subscriber |
 | `Discover(name)` | 服务发现（返回 ip:port） |
 | `ConfigType()` | 自动判断配置类型 |
+| `Config()` | 获取解析后的全局配置 |
+| `ServiceName()` | 获取当前服务名 |
+
+### QuickRegister vs Register
+
+| 方法 | 地址来源 | 适用场景 |
+|------|----------|----------|
+| `Register(ip, port)` | 调用方传入 | Nacos 模式，从 merged config 读取 |
+| `QuickRegister()` | `services.<name>.host/port` | 本地模式，无需额外配置 |
 
 ## 依赖
 
