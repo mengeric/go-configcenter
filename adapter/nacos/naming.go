@@ -34,15 +34,18 @@ func NewNamingService(client *Client) *NamingService {
 }
 
 // Register 注册服务实例到 Nacos
-// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组
+// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组, weight-权重（0使用默认值10）
 // 返回：成功/失败，错误信息
-func (ns *NamingService) Register(ip string, port uint64, serviceName, group string) (bool, error) {
+func (ns *NamingService) Register(ip string, port uint64, serviceName, group string, weight float64) (bool, error) {
+	if weight <= 0 {
+		weight = 10
+	}
 	return ns.client.NamingClient.RegisterInstance(vo.RegisterInstanceParam{
 		Ip:          ip,
 		Port:        port,
 		ServiceName: serviceName,
 		GroupName:   group,
-		Weight:      10,
+		Weight:      weight,
 		Enable:      true,
 		Healthy:     true,
 		Ephemeral:   true,

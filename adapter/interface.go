@@ -8,9 +8,9 @@ package adapter
 // NamingClient 服务注册与发现接口
 type NamingClient interface {
 	// Register 注册服务实例
-	// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组
+	// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组, weight-权重（0使用默认值10）
 	// 返回：成功/失败，错误信息
-	Register(ip string, port uint64, serviceName, group string) (bool, error)
+	Register(ip string, port uint64, serviceName, group string, weight float64) (bool, error)
 
 	// Deregister 注销服务实例
 	// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组

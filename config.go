@@ -42,6 +42,9 @@ type ServiceConfig struct {
 	// Port 服务端口（本地模式用于服务发现）
 	Port uint64 `yaml:"port" json:"port"`
 
+	// Weight 服务权重（默认10，范围0-100）
+	Weight float64 `yaml:"weight" json:"weight"`
+
 	// Local 本地配置文件列表（按顺序 merge，后面的覆盖前面的）
 	Local []string `yaml:"local" json:"local"`
 

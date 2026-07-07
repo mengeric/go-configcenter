@@ -138,7 +138,10 @@ func Init(configPath, serviceName string) (*SDK, error) {
 // 参数：ip-监听地址, port-监听端口
 // 返回：错误信息
 func (s *SDK) Register(ip string, port uint64) error {
-	ok, err := s.namingClient.Register(ip, port, s.serviceName, s.group)
+	// 从配置读取权重（默认10）
+	weight := s.config.Services[s.serviceName].Weight
+
+	ok, err := s.namingClient.Register(ip, port, s.serviceName, s.group, weight)
 	if err != nil {
 		return fmt.Errorf("register service %s failed: %w", s.serviceName, err)
 	}

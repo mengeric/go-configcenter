@@ -52,16 +52,20 @@ func NewLocalNamingService(services map[string]ServiceAddr) *LocalNamingService 
 }
 
 // Register 本地模式注册（记录到内存，不做网络调用）
-// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组（本地模式忽略）
+// 参数：ip-监听地址, port-监听端口, serviceName-服务名, group-分组（本地模式忽略）, weight-权重
 // 返回：成功/失败，错误信息
-func (ln *LocalNamingService) Register(ip string, port uint64, serviceName, group string) (bool, error) {
+func (ln *LocalNamingService) Register(ip string, port uint64, serviceName, group string, weight float64) (bool, error) {
 	ln.lock.Lock()
 	defer ln.lock.Unlock()
+
+	if weight <= 0 {
+		weight = 10
+	}
 
 	ln.cache[serviceName] = []adapter.Instance{{
 		Ip:      ip,
 		Port:    port,
-		Weight:  10,
+		Weight:  weight,
 		Healthy: true,
 		Enable:  true,
 	}}
