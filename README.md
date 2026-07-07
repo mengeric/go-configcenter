@@ -34,9 +34,13 @@ cc := configurator.MustNewConfigCenter[Config](configurator.Config{
 }, s.Subscriber())
 c, err := cc.GetConfig()
 
-// 发现其他服务（返回 http://ip:port）
+// 发现其他服务（HTTP 用，返回 http://ip:port）
 addr, err := s.Discover("phoenix")
 // addr = "http://192.168.110.164:10011"
+
+// gRPC 用（返回 ip:port）
+addr, err := s.DiscoverRaw("wormhole")
+// addr = "192.168.110.164:8885"
 ```
 
 ## 配置文件
@@ -114,7 +118,8 @@ services:
 | `QuickRegister()` | 快速注册（从全局配置 host/port 读取） |
 | `Deregister()` | 注销服务 |
 | `Subscriber()` | 返回 go-zero Subscriber |
-| `Discover(name)` | 服务发现（返回 ip:port） |
+| `Discover(name)` | 服务发现（返回 scheme://ip:port，HTTP 用） |
+| `DiscoverRaw(name)` | 服务发现（返回 ip:port，gRPC 用） |
 | `ConfigType()` | 自动判断配置类型 |
 | `Config()` | 获取解析后的全局配置 |
 | `ServiceName()` | 获取当前服务名 |
