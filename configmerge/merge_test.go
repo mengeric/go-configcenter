@@ -124,6 +124,79 @@ func TestMerger_EmptyFiles(t *testing.T) {
 	}
 }
 
+func TestMerger_PartialOverride(t *testing.T) {
+	// 模拟 basic.yaml (SHARE) 和 galaxy.yaml (DEFAULT_GROUP) 的合并
+	// basic.yaml 有完整的 Redis 配置（DB: 0），galaxy.yaml 只覆盖 DB: 1
+	os.MkdirAll("test-config", 0755)
+	defer os.RemoveAll("test-config")
+
+	basicConfig := `
+Redis:
+  Host: "192.168.110.164:6379"
+  Pass: ""
+  Type: "node"
+  DB: 0
+PhoenixDB:
+  Type: "mysql"
+  Host: "192.168.110.164"
+  Port: 3306
+  Schema: "phoenix"
+  User: "root"
+  Password: "Root@123"
+`
+
+	// galaxy.yaml 只覆盖 Redis.DB
+	galaxyConfig := `
+Name: galaxy
+Host: 0.0.0.0
+Port: 8888
+Redis:
+  DB: 1
+`
+
+	os.WriteFile("test-config/basic.yaml", []byte(basicConfig), 0644)
+	os.WriteFile("test-config/galaxy.yaml", []byte(galaxyConfig), 0644)
+
+	merger := NewMerger("galaxy", []string{
+		"test-config/basic.yaml",
+		"test-config/galaxy.yaml",
+	})
+
+	data, err := merger.MergeToBytes()
+	if err != nil {
+		t.Fatalf("MergeToBytes failed: %v", err)
+	}
+
+	content := string(data)
+
+	// Redis.Host 应该保留（basic.yaml 的值）
+	if !contains(content, "192.168.110.164:6379") {
+		t.Errorf("merged config should preserve Redis.Host from basic.yaml, got:\n%s", content)
+	}
+
+	// Redis.DB 应该被覆盖为 1
+	if !contains(content, "DB: 1") {
+		t.Errorf("merged config should have Redis.DB: 1, got:\n%s", content)
+	}
+
+	// Redis.Pass 应该保留
+	if !contains(content, `Pass: ""`) {
+		t.Errorf("merged config should preserve Redis.Pass, got:\n%s", content)
+	}
+
+	// PhoenixDB 应该完整保留
+	if !contains(content, "Schema: phoenix") {
+		t.Errorf("merged config should preserve PhoenixDB, got:\n%s", content)
+	}
+
+	// Name 应该是 galaxy
+	if !contains(content, "Name: galaxy") {
+		t.Errorf("merged config should have Name: galaxy, got:\n%s", content)
+	}
+
+	t.Logf("Merged config:\n%s", content)
+}
+
 // contains 检查字符串是否包含子串
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))

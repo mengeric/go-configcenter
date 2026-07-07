@@ -17,7 +17,7 @@ func TestLocalNamingService_Register(t *testing.T) {
 	svc := NewLocalNamingService(services)
 
 	// 注册新服务
-	ok, err := svc.Register("192.168.1.2", 9999, "galaxy", "DEFAULT_GROUP")
+	ok, err := svc.Register("192.168.1.2", 9999, "galaxy", "DEFAULT_GROUP", 10)
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestLocalNamingService_Deregister(t *testing.T) {
 	svc := NewLocalNamingService(services)
 
 	// 注册
-	svc.Register("192.168.1.2", 9999, "galaxy", "DEFAULT_GROUP")
+	svc.Register("192.168.1.2", 9999, "galaxy", "DEFAULT_GROUP", 10)
 
 	// 注销
 	ok, err := svc.Deregister("192.168.1.2", 9999, "galaxy", "DEFAULT_GROUP")

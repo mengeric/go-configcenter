@@ -79,19 +79,86 @@ func (m *Merger) MergeToBytes() ([]byte, error) {
 	return yamlv2.Marshal(merged)
 }
 
-// mergeMap 递归合并 map（dst 被 src 覆盖）
-func mergeMap(dst, src map[string]interface{}) {
+// mergeMap 递归合并（原地修改 dst）
+func mergeMap(dst, src interface{}) {
+	switch srcMap := src.(type) {
+	case map[string]interface{}:
+		switch dstMap := dst.(type) {
+		case map[string]interface{}:
+			mergeStrMap(dstMap, srcMap)
+		case map[interface{}]interface{}:
+			mergeInterfaceMap(dstMap, srcMap)
+		}
+	case map[interface{}]interface{}:
+		switch dstMap := dst.(type) {
+		case map[string]interface{}:
+			for k, v := range srcMap {
+				mergeMap(dstMap[fmt.Sprintf("%v", k)], v)
+				dstMap[fmt.Sprintf("%v", k)] = v
+			}
+		case map[interface{}]interface{}:
+			for k, v := range srcMap {
+				if dstVal, ok := dstMap[k]; ok {
+					if isMap(dstVal) && isMap(v) {
+						mergeMap(dstVal, v)
+						continue
+					}
+				}
+				dstMap[k] = v
+			}
+		}
+	}
+}
+
+// mergeStrMap 合并两个 map[string]interface{}
+func mergeStrMap(dst, src map[string]interface{}) {
 	for k, v := range src {
 		if dstVal, ok := dst[k]; ok {
-			// 两个都是 map 时递归合并
-			if dstMap, ok := dstVal.(map[string]interface{}); ok {
-				if srcMap, ok := v.(map[string]interface{}); ok {
-					mergeMap(dstMap, srcMap)
-					continue
-				}
+			if isMap(dstVal) && isMap(v) {
+				mergeMap(dstVal, v)
+				continue
 			}
 		}
 		dst[k] = v
+	}
+}
+
+// mergeInterfaceMap 将 src[string] 合并到 dst[interface{}]
+func mergeInterfaceMap(dst map[interface{}]interface{}, src map[string]interface{}) {
+	for k, v := range src {
+		if dstVal, ok := dst[k]; ok {
+			if isMap(dstVal) && isMap(v) {
+				mergeMap(dstVal, v)
+				continue
+			}
+		}
+		dst[k] = v
+	}
+}
+
+// isMap 检查值是否是 map 类型
+func isMap(v interface{}) bool {
+	switch v.(type) {
+	case map[string]interface{}, map[interface{}]interface{}:
+		return true
+	}
+	return false
+}
+
+// toStrMap 将 map[interface{}]interface{} 转换为 map[string]interface{}
+// yaml.v2 解析 YAML 时会返回 interface{} 类型的 key，需要转换为 string
+var toStrMap = func(v interface{}) (map[string]interface{}, bool) {
+	switch m := v.(type) {
+	case map[string]interface{}:
+		return m, true
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{})
+		for key, val := range m {
+			result[fmt.Sprintf("%v", key)] = val
+		}
+		return result, true
+	default:
+		return nil, false
 	}
 }
 

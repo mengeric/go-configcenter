@@ -15,7 +15,7 @@ type MockNamingClient struct {
 	discoverAddr string
 }
 
-func (m *MockNamingClient) Register(ip string, port uint64, serviceName, group string) (bool, error) {
+func (m *MockNamingClient) Register(ip string, port uint64, serviceName, group string, weight float64) (bool, error) {
 	m.registered = true
 	return true, nil
 }
@@ -64,7 +64,7 @@ func TestMockNamingClient(t *testing.T) {
 	mock := &MockNamingClient{discoverAddr: "192.168.1.1:8888"}
 
 	// 测试 Register
-	ok, err := mock.Register("0.0.0.0", 8888, "galaxy", "DEFAULT_GROUP")
+	ok, err := mock.Register("0.0.0.0", 8888, "galaxy", "DEFAULT_GROUP", 10)
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
