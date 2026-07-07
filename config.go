@@ -21,6 +21,10 @@ type RegistryConfig struct {
 	// Addr 注册中心地址（ip:port）
 	Addr string `yaml:"addr" json:"addr"`
 
+	// Scheme 服务地址协议（http/https），默认 http
+	// Discover 返回 scheme://ip:port 格式
+	Scheme string `yaml:"scheme" json:"scheme"`
+
 	// Namespace 命名空间（nacos 用，public 传空字符串）
 	Namespace string `yaml:"namespace" json:"namespace"`
 

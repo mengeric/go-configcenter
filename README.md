@@ -34,8 +34,9 @@ cc := configurator.MustNewConfigCenter[Config](configurator.Config{
 }, s.Subscriber())
 c, err := cc.GetConfig()
 
-// 发现其他服务
+// 发现其他服务（返回 http://ip:port）
 addr, err := s.Discover("phoenix")
+// addr = "http://192.168.110.164:10011"
 ```
 
 ## 配置文件
@@ -66,8 +67,11 @@ services:
 registry:
   type: "nacos"
   addr: "192.168.110.164:8848"
+  scheme: "http"          # Discover 返回 http://ip:port
   namespace: "public"
   group: "DEFAULT_GROUP"
+  username: "prod"
+  password: "prod"
 
 services:
   rag-service:

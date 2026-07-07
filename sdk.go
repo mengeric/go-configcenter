@@ -2,11 +2,12 @@ package goconfigcenter
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
-	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/file"
-	"github.com/knadh/koanf/v2"
+	"gopkg.in/yaml.v2"
 
 	"github.com/mengeric/go-configcenter/adapter"
 	"github.com/mengeric/go-configcenter/adapter/nacos"
@@ -56,17 +57,16 @@ func MustInit(configPath, serviceName string) *SDK {
 // 参数：configPath-argo.yaml 路径, serviceName-当前服务名
 // 返回：SDK 实例，错误信息
 func Init(configPath, serviceName string) (*SDK, error) {
-	// 1. 加载 argo.yaml
-	k := koanf.New(".")
-	if err := k.Load(file.Provider(configPath), yaml.Parser()); err != nil {
+	// 1. 读取并展开环境变量
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
 		return nil, fmt.Errorf("load argo.yaml failed: %w", err)
 	}
+	raw = expandEnv(raw)
 
 	// 2. 解析配置
 	var cfg ArgoConfig
-	if err := k.UnmarshalWithConf("", &cfg, koanf.UnmarshalConf{
-		Tag: "json",
-	}); err != nil {
+	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal argo.yaml failed: %w", err)
 	}
 
@@ -124,14 +124,43 @@ func Init(configPath, serviceName string) (*SDK, error) {
 	}
 
 	return &SDK{
-		configPath: configPath,
-		config:     &cfg,
+		configPath:  configPath,
+		config:      &cfg,
 		serviceName: serviceName,
 		namingClient: namingClient,
 		configClient: configClient,
-		merger:      merger,
-		group:       cfg.Registry.Group,
+		merger:       merger,
+		group:        cfg.Registry.Group,
 	}, nil
+}
+
+// ============================================================
+// 环境变量展开
+// ============================================================
+
+// envPattern 匹配 ${ENV_VAR} 和 ${ENV_VAR:-default}
+var envPattern = regexp.MustCompile(`\$\{([^}]+)}`)
+
+// expandEnv 将 ${VAR} / ${VAR:-default} 替换为环境变量值
+func expandEnv(data []byte) []byte {
+	return envPattern.ReplaceAllFunc(data, func(match []byte) []byte {
+		expr := string(match[2 : len(match)-1])
+		varName, defaultVal, hasDefault := "", "", false
+		if idx := strings.Index(expr, ":-"); idx >= 0 {
+			varName = expr[:idx]
+			defaultVal = expr[idx+2:]
+			hasDefault = true
+		} else {
+			varName = expr
+		}
+		if val := os.Getenv(varName); val != "" {
+			return []byte(val)
+		}
+		if hasDefault {
+			return []byte(defaultVal)
+		}
+		return match
+	})
 }
 
 // Register 注册服务到注册中心
@@ -179,14 +208,23 @@ func (s *SDK) Deregister() error {
 	return nil
 }
 
-// Discover 发现服务实例（返回 ip:port）
+// Discover 发现服务实例（返回 scheme://ip:port）
 // 参数：serviceName-要发现的服务名
-// 返回：地址字符串，错误信息
+// 返回：完整地址字符串（如 http://192.168.110.164:8888），错误信息
 func (s *SDK) Discover(serviceName string) (string, error) {
-	return s.namingClient.Discover(serviceName, s.group)
+	addr, err := s.namingClient.Discover(serviceName, s.group)
+	if err != nil {
+		return "", err
+	}
+	// 拼接 scheme
+	scheme := s.config.Registry.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	return scheme + "://" + addr, nil
 }
 
-// Subscriber 返回 go-zero configcenter.Subscriber 实现
+// Subscriber 返回 go-zero configcenter.Subscriber 实例
 // 返回：配置订阅器实例
 func (s *SDK) Subscriber() *subscriber.ConfigSubscriber {
 	// 转换 remote 配置
@@ -210,8 +248,6 @@ func (s *SDK) Subscriber() *subscriber.ConfigSubscriber {
 func (s *SDK) ConfigType() string {
 	return s.merger.ConfigType()
 }
-
-
 
 // ServiceName 获取当前服务名
 // 返回：服务名
