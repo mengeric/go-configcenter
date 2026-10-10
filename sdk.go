@@ -12,6 +12,7 @@ import (
 	"github.com/mengeric/go-configcenter/adapter"
 	"github.com/mengeric/go-configcenter/adapter/nacos"
 	"github.com/mengeric/go-configcenter/configmerge"
+	"github.com/mengeric/go-configcenter/internal/netutil"
 	"github.com/mengeric/go-configcenter/local"
 	"github.com/mengeric/go-configcenter/subscriber"
 )
@@ -164,9 +165,17 @@ func expandEnv(data []byte) []byte {
 }
 
 // Register 注册服务到注册中心
-// 参数：ip-监听地址, port-监听端口
+// 参数：ip-监听地址（留空或 "0.0.0.0" 将自动智能推导真实出网/容器 IP）, port-监听端口
 // 返回：错误信息
 func (s *SDK) Register(ip string, port uint64) error {
+	// 针对未指定或留空 IP，启动自动探测（Docker/容器环境友好）
+	if ip == "" || ip == "0.0.0.0" {
+		var err error
+		if ip, err = netutil.ResolveRegisterIP(s.config.Registry.Addr); err != nil {
+			return fmt.Errorf("detect register ip failed for service %s: %w", s.serviceName, err)
+		}
+	}
+
 	// 从配置读取权重（默认10）
 	weight := s.config.Services[s.serviceName].Weight
 
@@ -185,12 +194,12 @@ func (s *SDK) Register(ip string, port uint64) error {
 }
 
 // QuickRegister 快速注册 — 从全局配置 services.<name>.host/port 读取地址并注册
-// 适用于 Nacos 不可用时的本地 fallback 模式
+// 适用于 Nacos 不可用时的本地 fallback 模式，若 host 为空或 0.0.0.0 则自动探测真实 IP
 // 返回：错误信息
 func (s *SDK) QuickRegister() error {
 	svc := s.config.Services[s.serviceName]
-	if svc.Host == "" || svc.Port == 0 {
-		return fmt.Errorf("service %s host/port not configured in argo.yaml", s.serviceName)
+	if svc.Port == 0 {
+		return fmt.Errorf("service %s port not configured in argo.yaml", s.serviceName)
 	}
 	return s.Register(svc.Host, uint64(svc.Port))
 }
