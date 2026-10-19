@@ -97,8 +97,11 @@ services:
 | `Register(ip, port)` | 注册服务（传空或 `0.0.0.0` 自动探测出网 IP） |
 | `QuickRegister()` | 快速注册（从全局配置 host/port 读取，支持自动 IP 探测） |
 | `Deregister()` | 从注册中心注销服务 |
-| `Discover(name)` | 服务发现（带 scheme，如 `http://ip:port`） |
-| `DiscoverRaw(name)` | 服务发现（纯 `ip:port`，gRPC 适用） |
+| `Discover(name)` | 动态服务发现（带 scheme，如 `http://ip:port`，自动订阅与加权轮询） |
+| `DiscoverRaw(name)` | 动态服务发现（纯 `ip:port`，gRPC 适用，自动订阅） |
+| `DiscoverAll(name)` | 发现目标服务所有可用健康实例列表 |
+| `Subscribe(name, callback)` | 订阅目标服务实例动态变更（带初始快照回放） |
+| `Unsubscribe(name)` | 取消指定服务的实例变更订阅 |
 | `Subscriber()` | 获取 go-zero 兼容的动态配置订阅器 |
 | `Config()` | 获取全局配置实例 |
 | `ServiceName()` | 获取当前服务名称 |

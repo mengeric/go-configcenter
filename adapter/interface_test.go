@@ -29,6 +29,16 @@ func (m *MockNamingClient) Discover(serviceName, group string) (string, error) {
 	return m.discoverAddr, nil
 }
 
+func (m *MockNamingClient) DiscoverAll(serviceName, group string) ([]Instance, error) {
+	return []Instance{{
+		Ip:      "192.168.1.1",
+		Port:    8888,
+		Weight:  10,
+		Healthy: true,
+		Enable:  true,
+	}}, nil
+}
+
 func (m *MockNamingClient) Subscribe(serviceName, group string, callback func([]Instance)) error {
 	return nil
 }
@@ -94,6 +104,15 @@ func TestMockNamingClient(t *testing.T) {
 	}
 	if addr != "192.168.1.1:8888" {
 		t.Errorf("Discover = %s, want 192.168.1.1:8888", addr)
+	}
+
+	// 测试 DiscoverAll
+	instances, err := mock.DiscoverAll("phoenix", "DEFAULT_GROUP")
+	if err != nil {
+		t.Fatalf("DiscoverAll failed: %v", err)
+	}
+	if len(instances) != 1 || instances[0].Ip != "192.168.1.1" {
+		t.Errorf("DiscoverAll unexpected result: %+v", instances)
 	}
 }
 

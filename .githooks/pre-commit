@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Git pre-commit hook: 提交前强制执行对抗性测试与集成测试门闸
+# ==============================================================================
+
+set -e
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+echo -e "${CYAN}==> [Git Hook] 检测到 commit 操作，正在执行提交前质量门闸测试...${NC}"
+
+# 1. 运行对抗性防御测试 (Adversarial Tests)
+echo -e "${YELLOW}--> [1/2] 运行对抗性与边界防御测试 (test-adversarial)...${NC}"
+if ! go test -v ./tests/adversarial/...; then
+    echo -e "${RED}[ERROR] 对抗性测试失败 (Adversarial test failed)! 拒绝本次 commit。${NC}"
+    echo -e "${RED}请修复上述边界与防御问题后再重新提交。${NC}"
+    exit 1
+fi
+
+# 2. 运行端到端集成测试 (Integration Tests)
+echo -e "${YELLOW}--> [2/2] 运行端到端集成测试 (test-integration)...${NC}"
+if ! go test -v ./tests/integration/...; then
+    echo -e "${RED}[ERROR] 集成测试失败 (Integration test failed)! 拒绝本次 commit。${NC}"
+    echo -e "${RED}请修复上述集成链路问题后再重新提交。${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}==> [Git Hook] 对抗性测试与集成测试全部通过 (ALL TESTS PASSED)，允许提交!${NC}"
+exit 0

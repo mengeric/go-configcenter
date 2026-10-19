@@ -22,6 +22,11 @@ type NamingClient interface {
 	// 返回：地址字符串，错误信息
 	Discover(serviceName, group string) (string, error)
 
+	// DiscoverAll 发现所有可用服务实例
+	// 参数：serviceName-服务名, group-分组
+	// 返回：实例切片，错误信息
+	DiscoverAll(serviceName, group string) ([]Instance, error)
+
 	// Subscribe 订阅服务实例变化（动态更新）
 	// 参数：serviceName-服务名, group-分组, callback-实例变化回调
 	// 返回：错误信息

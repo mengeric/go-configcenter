@@ -50,3 +50,15 @@ services:
 
 ### `DiscoverRaw(serviceName string) (string, error)`
 - **功能**：服务发现，返回纯 `ip:port` 格式（适用于 gRPC 连接）。
+
+### `DiscoverAll(serviceName string) ([]adapter.Instance, error)`
+- **功能**：服务发现，返回目标服务当前所有可用的健康实例列表（含 IP、Port、Weight、Metadata 等）。
+
+### `Subscribe(serviceName string, callback func([]adapter.Instance)) error`
+- **功能**：订阅目标服务的实例动态变更通知。当服务实例上线、下线、权重变更或健康状态变化时自动执行回调，且在注册成功后立即用当前实例快照执行一次初始通知。
+- **参数**：
+  - `serviceName`: 目标服务名
+  - `callback`: 实例切片变更回调函数
+
+### `Unsubscribe(serviceName string) error`
+- **功能**：取消目标服务的实例动态变更订阅，清理本地缓存与监听器，并注销 Nacos 底层订阅通道。

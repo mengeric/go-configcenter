@@ -125,9 +125,9 @@ func Init(configPath, serviceName string) (*SDK, error) {
 	}
 
 	return &SDK{
-		configPath:  configPath,
-		config:      &cfg,
-		serviceName: serviceName,
+		configPath:   configPath,
+		config:       &cfg,
+		serviceName:  serviceName,
 		namingClient: namingClient,
 		configClient: configClient,
 		merger:       merger,
@@ -239,6 +239,31 @@ func (s *SDK) Discover(serviceName string) (string, error) {
 // 返回：ip:port 格式地址，错误信息
 func (s *SDK) DiscoverRaw(serviceName string) (string, error) {
 	return s.namingClient.Discover(serviceName, s.group)
+}
+
+// DiscoverAll 发现目标服务的所有可用健康实例
+// 适用于集群调用、连接池预热或多地址轮询
+// 参数：serviceName-要发现的服务名
+// 返回：实例切片（包含 IP、Port、Weight、Metadata 等），错误信息
+func (s *SDK) DiscoverAll(serviceName string) ([]adapter.Instance, error) {
+	return s.namingClient.DiscoverAll(serviceName, s.group)
+}
+
+// Subscribe 订阅指定服务的实例动态变更
+// 当目标服务的实例发生上线、下线、权重修改或健康状态变更时，触发回调通知
+// 订阅成功后若已存在可用实例快照，将立即回放触发一次初始通知
+// 参数：serviceName-服务名, callback-实例变更回调函数
+// 返回：错误信息
+func (s *SDK) Subscribe(serviceName string, callback func([]adapter.Instance)) error {
+	return s.namingClient.Subscribe(serviceName, s.group, callback)
+}
+
+// Unsubscribe 取消指定服务的实例变更订阅
+// 清理本地监听器与缓存，并关闭底层注册中心的订阅长通道
+// 参数：serviceName-服务名
+// 返回：错误信息
+func (s *SDK) Unsubscribe(serviceName string) error {
+	return s.namingClient.Unsubscribe(serviceName, s.group)
 }
 
 // Subscriber 返回 go-zero configcenter.Subscriber 实例

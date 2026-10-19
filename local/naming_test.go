@@ -62,7 +62,7 @@ func TestLocalNamingService_Deregister(t *testing.T) {
 
 func TestLocalNamingService_Discover(t *testing.T) {
 	services := map[string]ServiceAddr{
-		"phoenix": {Host: "192.168.1.1", Port: 10011},
+		"phoenix":  {Host: "192.168.1.1", Port: 10011},
 		"stargate": {Host: "192.168.1.2", Port: 8800},
 	}
 	svc := NewLocalNamingService(services)
@@ -89,6 +89,15 @@ func TestLocalNamingService_Discover(t *testing.T) {
 	_, err = svc.Discover("nonexistent", "DEFAULT_GROUP")
 	if err == nil {
 		t.Fatal("Discover nonexistent should failed")
+	}
+
+	// 测试 DiscoverAll
+	instances, err := svc.DiscoverAll("phoenix", "DEFAULT_GROUP")
+	if err != nil {
+		t.Fatalf("DiscoverAll phoenix failed: %v", err)
+	}
+	if len(instances) != 1 || instances[0].Port != 10011 {
+		t.Errorf("DiscoverAll phoenix mismatch: %+v", instances)
 	}
 }
 
@@ -122,9 +131,48 @@ func TestLocalNamingService_Subscribe(t *testing.T) {
 func TestLocalNamingService_Unsubscribe(t *testing.T) {
 	svc := NewLocalNamingService(map[string]ServiceAddr{})
 
-	// 取消订阅（本地模式无操作）
+	// 取消订阅
 	err := svc.Unsubscribe("phoenix", "DEFAULT_GROUP")
 	if err != nil {
 		t.Fatalf("Unsubscribe failed: %v", err)
+	}
+}
+
+func TestLocalNamingService_DynamicNotification(t *testing.T) {
+	svc := NewLocalNamingService(map[string]ServiceAddr{})
+
+	var received []adapter.Instance
+	callCount := 0
+	err := svc.Subscribe("dynamic-svc", "DEFAULT_GROUP", func(instances []adapter.Instance) {
+		received = instances
+		callCount++
+	})
+	if err != nil {
+		t.Fatalf("Subscribe failed: %v", err)
+	}
+
+	// 此时无实例，回调未触发
+	if callCount != 0 {
+		t.Fatalf("callCount = %d, want 0", callCount)
+	}
+
+	// 动态注册新实例
+	_, err = svc.Register("192.168.10.5", 7001, "dynamic-svc", "DEFAULT_GROUP", 20)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	if callCount != 1 || len(received) != 1 || received[0].Port != 7001 {
+		t.Fatalf("expected 1 instance after register, got: %+v (callCount=%d)", received, callCount)
+	}
+
+	// 动态注销
+	_, err = svc.Deregister("192.168.10.5", 7001, "dynamic-svc", "DEFAULT_GROUP")
+	if err != nil {
+		t.Fatalf("Deregister failed: %v", err)
+	}
+
+	if callCount != 2 || len(received) != 0 {
+		t.Fatalf("expected 0 instance after deregister, got: %+v (callCount=%d)", received, callCount)
 	}
 }

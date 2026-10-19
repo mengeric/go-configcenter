@@ -79,6 +79,7 @@ type NamingClient interface {
     Register(ip string, port uint64, serviceName, group string, weight float64) (bool, error)
     Deregister(ip string, port uint64, serviceName, group string) (bool, error)
     Discover(serviceName, group string) (string, error)
+    DiscoverAll(serviceName, group string) ([]Instance, error)
     Subscribe(serviceName, group string, callback func([]Instance)) error
     Unsubscribe(serviceName, group string) error
 }
@@ -91,4 +92,22 @@ type ConfigClient interface {
     GetConfig(dataId, group string) (string, error)
     WatchConfig(dataId, group string, callback func(string)) error
 }
+```
+
+---
+
+## 5. 动态服务发现与自动订阅机制 (Dynamic Discovery Pipeline)
+
+为避免业务启动后实例变更无法感知及无订阅导致的本地缓存失活，服务发现设计遵循**首次发现即自动订阅**原则：
+
+```text
+1. 业务调用 Discover(serviceName) / DiscoverAll(serviceName)；
+2. SDK 检查该服务是否已订阅：
+   - 若未订阅：触发 ensureSubscribed，同步获取健康实例初始化本地内存 cache，并向 Nacos 注册动态长连接订阅；
+   - 若已订阅：直接跳过初始化；
+3. Discover 从本地安全读写锁 cache 中执行加权轮询负载均衡 (WRR)；
+4. 当远程实例发生变动（上线/下线/宕机/权重调整），Nacos 服务端主动推送：
+   - 命名服务自动刷新本地 cache；
+   - 广播通知所有已注册的业务监听者（listeners），实现长连接池/连接拓扑的平滑热更新；
+5. 若全部实例不可用或下线，加权算法返回明确错误，绝不 panic，绝不返回脏数据。
 ```
